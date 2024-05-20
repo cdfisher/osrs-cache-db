@@ -1,0 +1,8 @@
+# go.sum isn't really helpful to commit
+/go.sum
+# Any generated executables
+*.exe
+# JetBrains stuff
+/.idea/*
+# Files in the project for my ow
+/reference/
