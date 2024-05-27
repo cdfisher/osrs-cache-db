@@ -21,13 +21,15 @@ import (
 var db *sql.DB
 var err error
 
-func GetItemsFromID(c *gin.Context) {
-	itemID := c.Param("id")
+func notFound(c *gin.Context, key string, route string) {
+	c.IndentedJSON(http.StatusNotFound, gin.H{"message": fmt.Sprintf("Parameter %s not found for route %s", key,
+		route)})
+}
 
-	var results []ItemEntry
+func fetchItems(query string, itemID string, c *gin.Context) []ItemEntry {
+	var output []ItemEntry
 
-	statement := "SELECT * FROM items WHERE id == ? ORDER BY id"
-	dbRows, err := db.QueryContext(c, statement, itemID)
+	dbRows, err := db.QueryContext(c, query, itemID)
 	if err != nil {
 		log.Fatal("Error encountered executing query for search ", itemID, " : ", err)
 	}
@@ -51,25 +53,97 @@ func GetItemsFromID(c *gin.Context) {
 		if err != nil {
 			fmt.Println(err)
 		}
-		results = append(results, rowData)
+		output = append(output, rowData)
 		i++
 	}
+	return output
+}
 
-	if i > 0 {
+func BuildItemQuery(key string, c *gin.Context) string {
+	queryType, ok := ItemQueryTypes[key]
+	if !ok {
+		notFound(c, key, "/items")
+	}
+
+	switch queryType {
+	case 1:
+		query := Queries[1]
+		return fmt.Sprintf(query, "items", key)
+	case 2:
+		query := Queries[2]
+		return fmt.Sprintf(query, "items", key)
+	case 3:
+		if c.Param(":value") == "null" {
+			// needs exact match
+			query := Queries[1]
+			return fmt.Sprintf(query, "items", key)
+		} else {
+			// otherwise fuzzy match is good
+			query := Queries[2]
+			return fmt.Sprintf(query, "items", key)
+		}
+	default:
+		// Unreachable case currently
+		c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("The server somehow got " +
+			"to an unreachable state.")})
+	}
+	return ""
+}
+
+func GetItems(c *gin.Context) {
+	searchKey := c.Param("key")
+	searchVal := c.Param("value")
+
+	var results []ItemEntry
+
+	queryString := BuildItemQuery(searchKey, c)
+	results = append(results, fetchItems(queryString, searchVal, c)...)
+
+	n := len(results)
+
+	if n > 0 {
 		fmt.Print(results, "\n")
 		c.JSON(http.StatusOK, results)
 	} else {
-		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "item id not found"})
+		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "No items matching query were found"})
 	}
 }
 
-func GetNPCsFromID(c *gin.Context) {
-	npcID := c.Param("id")
+func BuildNPCQuery(key string, c *gin.Context) string {
+	queryType, ok := NPCQueryTypes[key]
+	if !ok {
+		notFound(c, key, "/npcs")
+	}
 
-	var results []NPCEntry
+	switch queryType {
+	case 1:
+		query := Queries[1]
+		return fmt.Sprintf(query, "npcs", key)
+	case 2:
+		query := Queries[2]
+		return fmt.Sprintf(query, "npcs", key)
+	case 3:
+		if c.Param(":value") == "null" {
+			// needs exact match
+			query := Queries[1]
+			return fmt.Sprintf(query, "npcs", key)
+		} else {
+			// otherwise fuzzy match is good
+			query := Queries[2]
+			return fmt.Sprintf(query, "npcs", key)
+		}
+	default:
+		// Unreachable case currently
+		c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("The server somehow got " +
+			"to an unreachable state.")})
+	}
+	return ""
+}
 
-	statement := "SELECT * FROM npcs WHERE id == ? ORDER BY id"
-	dbRows, err := db.QueryContext(c, statement, npcID)
+func fetchNPCs(query string, npcID string, c *gin.Context) []NPCEntry {
+	var output []NPCEntry
+
+	dbRows, err := db.QueryContext(c, query, npcID)
 	if err != nil {
 		log.Fatal("Error encountered executing query for search ", npcID, " : ", err)
 	}
@@ -93,25 +167,34 @@ func GetNPCsFromID(c *gin.Context) {
 		if err != nil {
 			fmt.Println(err)
 		}
-		results = append(results, rowData)
+		output = append(output, rowData)
 		i++
 	}
+	return output
+}
 
-	if i > 0 {
+func GetNPCs(c *gin.Context) {
+	searchKey := c.Param("key")
+	searchVal := c.Param("value")
+
+	var results []NPCEntry
+
+	queryString := BuildNPCQuery(searchKey, c)
+	results = append(results, fetchNPCs(queryString, searchVal, c)...)
+
+	n := len(results)
+
+	if n > 0 {
 		fmt.Print(results, "\n")
 		c.JSON(http.StatusOK, results)
 	} else {
-		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "npc id not found"})
+		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "No NPCs matching query were found"})
 	}
 }
 
-func GetObjectsFromID(c *gin.Context) {
-	objectID := c.Param("id")
-
-	var results []ObjectEntry
-
-	statement := "SELECT * FROM objects WHERE id == ? ORDER BY id"
-	dbRows, err := db.QueryContext(c, statement, objectID)
+func fetchObjects(query string, objectID string, c *gin.Context) []ObjectEntry {
+	var output []ObjectEntry
+	dbRows, err := db.QueryContext(c, query, objectID)
 	if err != nil {
 		log.Fatal("Error encountered executing query for search ", objectID, " : ", err)
 	}
@@ -135,23 +218,68 @@ func GetObjectsFromID(c *gin.Context) {
 		if err != nil {
 			fmt.Println(err)
 		}
-		results = append(results, rowData)
+		output = append(output, rowData)
 		i++
 	}
+	return output
+}
 
-	if i > 0 {
+func BuildObjectQuery(key string, c *gin.Context) string {
+	queryType, ok := ObjectQueryTypes[key]
+	if !ok {
+		notFound(c, key, "/objects")
+	}
+
+	switch queryType {
+	case 1:
+		query := Queries[1]
+		return fmt.Sprintf(query, "objects", key)
+	case 2:
+		query := Queries[2]
+		return fmt.Sprintf(query, "objects", key)
+	case 3:
+		if c.Param(":value") == "null" {
+			// needs exact match
+			query := Queries[1]
+			return fmt.Sprintf(query, "objects", key)
+		} else {
+			// otherwise fuzzy match is good
+			query := Queries[2]
+			return fmt.Sprintf(query, "objects", key)
+		}
+	default:
+		// Unreachable case currently
+		c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("The server somehow got " +
+			"to an unreachable state.")})
+	}
+	return ""
+}
+
+func GetObjects(c *gin.Context) {
+	searchKey := c.Param("key")
+	searchVal := c.Param("value")
+
+	var results []ObjectEntry
+
+	queryString := BuildObjectQuery(searchKey, c)
+	results = append(results, fetchObjects(queryString, searchVal, c)...)
+
+	n := len(results)
+
+	if n > 0 {
 		fmt.Print(results, "\n")
 		c.JSON(http.StatusOK, results)
 	} else {
-		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "object id not found"})
+		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "No objects matching query were found"})
 	}
 }
 
 func initializeRouter() *gin.Engine {
 	r := gin.Default()
-	r.GET("items/:id", GetItemsFromID)
-	r.GET("npcs/:id", GetNPCsFromID)
-	r.GET("objects/:id", GetObjectsFromID)
+	// TODO implement query params so these can be combined
+	r.GET("items/:key/:value", GetItems)
+	r.GET("npcs/:key/:value", GetNPCs)
+	r.GET("objects/:key/:value", GetObjects)
 	return r
 }
 
