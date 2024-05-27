@@ -249,7 +249,7 @@ func PopulateTables(cachePath string, database *sql.DB) {
 
 func main() {
 	dbName := "cache.db"
-	cacheVersion := "2024-05-15-rev221"
+	cacheVersion := "2024-05-23-rev222"
 	pathToCacheDump := fmt.Sprintf("C:\\Users\\cdfis\\Downloads\\dump-%s\\dump", cacheVersion)
 
 	db := initializeDB(dbName)
